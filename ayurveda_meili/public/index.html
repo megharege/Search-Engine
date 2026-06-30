@@ -16,7 +16,7 @@
             <div class="logo">
                 <h2>Ayurveda<br/><span>Explorer</span></h2>
             </div>
-            
+
             <div class="filter-section">
                 <h3>Search Mode</h3>
                 <div class="radio-group" id="mode-filter">
@@ -35,11 +35,32 @@
                     <label class="check-btn"><input type="checkbox" value="Madhavanisana Pt2"> <span>Madhavanisana Pt2</span></label>
                 </div>
             </div>
-            
+
+            <div class="filter-section">
+                <h3>Results Limit <span id="limit-display" class="limit-badge">20</span></h3>
+                <div class="range-wrapper">
+                    <input type="range" id="results-limit" min="5" max="100" step="5" value="20">
+                    <div class="range-labels">
+                        <span>5</span>
+                        <span>50</span>
+                        <span>100</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <h3>Search Memory
+                    <button id="clear-memory-btn" class="clear-memory-btn" title="Clear all memory">✕</button>
+                </h3>
+                <div id="history-list" class="history-list">
+                    <p class="history-empty">No recent searches.</p>
+                </div>
+            </div>
+
             <div class="branding">
-    <p>Powered by Meilisearch & AI</p>
-    <p><a href="https://megharege.github.io/search-engine/" target="_blank" rel="noopener noreferrer">Visit Live Site</a></p>
-</div>
+                <p>Powered by Meilisearch & AI</p>
+                <p><a href="https://megharege.github.io/search-engine/" target="_blank" rel="noopener noreferrer">Visit Live Site</a></p>
+            </div>
         </aside>
 
         <main class="main-content">
@@ -48,6 +69,7 @@
                     <div class="search-bar">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                         <input type="text" id="search-input" placeholder="Search verses, e.g. vata dosha jwara treatment..." autofocus>
+                        <button id="clear-search-btn" class="clear-search-btn" title="Clear search">✕</button>
                     </div>
                 </div>
                 <div class="search-stats" id="search-stats">
