@@ -192,6 +192,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const verse       = hit.verse_id  ? ` · Verse ${hit.verse_id}` : '';
             const sthana      = hit.sthana    ? ` (${hit.sthana})` : '';
 
+            // Ranking score badge
+            const score = hit._rankingScore !== undefined ? hit._rankingScore : null;
+            let scoreHtml = '';
+            if (score !== null) {
+                const pct = Math.round(score * 100);
+                const scoreClass = pct >= 75 ? 'score-high' : pct >= 45 ? 'score-mid' : 'score-low';
+                scoreHtml = `<span class="score-badge ${scoreClass}">${pct}%</span>`;
+            }
+
             let tagsHtml = '';
             const tags = new Set();
             if (hit.primary_category)  tags.add(hit.primary_category);
@@ -200,7 +209,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             html += `
                 <div class="verse-card" style="animation-delay:${index * 0.05}s">
-                    <div class="verse-meta">${source}${sthana}${chapter}${verse}</div>
+                    <div class="verse-meta-row">
+                        <span class="verse-rank">#${index + 1}</span>
+                        <span class="verse-meta">${source}${sthana}${chapter}${verse}</span>
+                        ${scoreHtml}
+                    </div>
                     ${topic      ? `<div class="verse-topic">${topic}</div>`           : ''}
                     ${sanskrit   ? `<div class="verse-sanskrit">${sanskrit}</div>`     : ''}
                     ${translit   ? `<div class="verse-translit">${translit}</div>`     : ''}

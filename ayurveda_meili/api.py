@@ -43,8 +43,15 @@ def search(req: SearchRequest):
         book_clause = " OR ".join([f'source_file = "{b}"' for b in req.books])
         params["filter"] = f"({book_clause})"
 
+    params["showRankingScore"] = True
+
     results = index.search(req.query, params)
-    return {"hits": results.get("hits", []), "processingTimeMs": results.get("processingTimeMs", 0)}
+    hits = results.get("hits", [])
+
+    # Sort by ranking score descending (highest relevance first)
+    hits.sort(key=lambda h: h.get("_rankingScore", 0), reverse=True)
+
+    return {"hits": hits, "processingTimeMs": results.get("processingTimeMs", 0)}
 
 app.mount("/", StaticFiles(directory="public", html=True), name="public")
 
