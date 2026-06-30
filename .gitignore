@@ -1,0 +1,35 @@
+# MeiliSearch data and binary
+ayurveda_meili/data.ms/
+ayurveda_meili/dumps/
+ayurveda_meili/meilisearch.exe
+ayurveda_meili/meili_logs/
+
+# Duplicate JSONL copies inside ayurveda_meili (originals are at root)
+ayurveda_meili/sushruta.jsonl
+ayurveda_meili/madhavanidanam.jsonl
+
+# Temp test script
+ayurveda_meili/quick_test.py
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
