@@ -3,6 +3,10 @@ ayurveda_meili/data.ms/
 ayurveda_meili/dumps/
 ayurveda_meili/meilisearch.exe
 ayurveda_meili/meili_logs/
+# Root-level Meilisearch artefacts (downloaded locally, NOT for GitHub)
+meilisearch.exe
+data.ms/
+enable_vector.py
 
 # Duplicate JSONL copies inside ayurveda_meili (originals are at root)
 ayurveda_meili/sushruta.jsonl
