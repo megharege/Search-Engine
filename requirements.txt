@@ -1,2 +1,7 @@
 streamlit
 meilisearch
+google-generativeai
+anthropic
+uvicorn
+fastapi
+mcp

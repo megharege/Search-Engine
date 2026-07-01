@@ -37,3 +37,22 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+
+# Credentials and Environment
+.env
+.env.*
+!.env.example
+
+# Docker Volumes
+meili_data/
+qdrant_data/
+caddy_data/
+
+# Large generated data artifacts (re-generate with generate_embeddings.py)
+merged_books_with_embeddings.jsonl
+Final data/merged_books_with_embeddings.jsonl
+Final data/combined.jsonl
+Final data/embeddings.npz
+Final data/embeddings.npz.sha256
+Final data/generate_embeddings.py
+dumps/

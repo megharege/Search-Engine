@@ -169,23 +169,26 @@ if "search_memory" not in st.session_state:
 if "search_query" not in st.session_state:
     st.session_state.search_query = ""
 
-# Initialize Meilisearch Client
-MEILI_URL = st.secrets.get("MEILI_URL", "http://localhost:7700")
-MEILI_KEY = st.secrets.get("MEILI_KEY", "ayurveda-dev-key")
-MEILI_INDEX = st.secrets.get("MEILI_INDEX", "ayurveda")
+from search_core import hybrid_search, get_available_texts
 
-@st.cache_resource
-def get_meili_client():
-    try:
-        return meilisearch.Client(MEILI_URL, MEILI_KEY)
-    except Exception:
-        return None
+# ── Load embedding model ONCE, shared across all sessions ────────────────────
+@st.cache_resource(show_spinner="Loading AI model (first time only)...")
+def load_embed_model():
+    import os
+    import torch
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    # Disable torch lazy initialization to avoid meta tensor errors in Streamlit
+    torch.set_default_device("cpu")
+    from sentence_transformers import SentenceTransformer
+    model = SentenceTransformer(
+        "intfloat/multilingual-e5-small",
+        device="cpu"
+    )
+    # Force full weight materialization with a warmup pass
+    _ = model.encode("warmup", show_progress_bar=False, convert_to_numpy=True)
+    return model
 
-client = get_meili_client()
-if client:
-    index = client.index(MEILI_INDEX)
-else:
-    index = None
+embed_model = load_embed_model()
 
 # Sidebar UI
 with st.sidebar:
@@ -216,7 +219,7 @@ with st.sidebar:
     else:
         st.caption("No recent searches.")
         
-    st.markdown("<br><br><p style='font-size: 12px; color: rgba(255, 255, 255, 0.3); text-align: center;'>Powered by Meilisearch & AI</p>", unsafe_allow_html=True)
+    st.markdown("<br><br><p style='font-size: 12px; color: rgba(255, 255, 255, 0.3); text-align: center;'>Powered by AI & search_core</p>", unsafe_allow_html=True)
 
 # Main Content
 st.title("")
@@ -234,35 +237,20 @@ current_query = st.session_state.search_query.strip()
 if current_query and (not st.session_state.search_memory or st.session_state.search_memory[-1] != current_query):
     st.session_state.search_memory.append(current_query)
 
-if not index:
-    st.error("Cannot connect to Meilisearch server. Make sure it's running on localhost:7700.")
+if not current_query:
+    pass
 elif current_query:
     with st.spinner("Searching ancient texts..."):
-        params = {
-            "limit": limit,
-            "attributesToHighlight": ["commentary", "transliteration", "topic_heading"],
-            "highlightPreTag": "<mark>",
-            "highlightPostTag": "</mark>",
-        }
-        
-        if mode == "Hybrid":
-            params["hybrid"] = {"semanticRatio": 0.5, "embedder": "default"}
-        elif mode == "Semantic":
-            params["hybrid"] = {"semanticRatio": 1.0, "embedder": "default"}
-            
-        if selected_books:
-            book_clause = " OR ".join([f'source_file = "{b}"' for b in selected_books])
-            params["filter"] = f"({book_clause})"
-            
         try:
-            results = index.search(current_query, params)
-            hits = results.get("hits", [])
-            time_ms = results.get("processingTimeMs", 0)
+            import time
+            start = time.time()
+            hits = hybrid_search(query=current_query, limit=limit, mode=mode, embed_model=embed_model)
+            time_ms = int((time.time() - start) * 1000)
             
             if not hits:
                 st.markdown('<div style="text-align:center; color:#94a3b8; padding: 40px;"><h3>No verses found</h3><p>Try adjusting your search query or removing filters.</p></div>', unsafe_allow_html=True)
             else:
-                st.markdown(f'<div class="search-stats">Found {len(hits)} results in {time_ms}ms (Mode: {mode})</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="search-stats">Found {len(hits)} results in {time_ms}ms (Hybrid + LLM)</div>', unsafe_allow_html=True)
                 
                 for i, hit in enumerate(hits, 1):
                     fmt = hit.get("_formatted", hit)
@@ -290,7 +278,7 @@ elif current_query:
                     
                     card_html = f"""
                     <div class="verse-card">
-                        <div class="verse-meta">#{i} &nbsp; {meta_str}</div>
+                        <div class="verse-meta">#{i} &nbsp; {meta_str} (Score: {hit.get('score', 0):.2f})</div>
                         {f'<div class="verse-topic">{topic}</div>' if topic else ''}
                         {f'<div class="verse-sanskrit">{sanskrit}</div>' if sanskrit else ''}
                         {f'<div class="verse-translit">{translit}</div>' if translit else ''}
@@ -301,6 +289,6 @@ elif current_query:
                     st.markdown(card_html, unsafe_allow_html=True)
                         
         except Exception as e:
-            st.error(f"Error querying Meilisearch: {e}")
+            st.error(f"Error querying backend: {e}")
 else:
     st.markdown('<div style="text-align:center; color:#94a3b8; padding: 40px;"><h3>Explore Ancient Wisdom</h3><p>Enter a query above to search through classical Ayurvedic texts.</p></div>', unsafe_allow_html=True)

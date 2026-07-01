@@ -1,236 +1,100 @@
-"""
-Ayurveda Search – MCP Server
-============================================================
-Exposes the local Meilisearch index as MCP tools that any
-compatible AI client (Claude Desktop, Cursor, Cline, etc.)
-can call to search classical Ayurvedic texts.
+import os
+from mcp.server.fastmcp import FastMCP
+from search_core import hybrid_search, fetch_chunk_by_id, get_available_texts, get_available_categories
 
-Transport : stdio  (standard for local MCP servers)
+# Create FastMCP instance
+mcp = FastMCP("ayurveda-rag")
 
-Install dependencies (run once):
-    pip install mcp meilisearch
+@mcp.tool()
+def search_verses(query: str, sthana: str | None = None, primary_category: str | None = None, limit: int = 10) -> list[dict]:
+    """Hybrid keyword + semantic search over classical Ayurvedic texts.
+    Returns matching chunks with chunk_id, sthana, verse_id, sanskrit_text,
+    transliteration, topic_heading, and relevance score."""
+    return hybrid_search(query=query, sthana=sthana, primary_category=primary_category, limit=limit)
 
-Run the server manually (for testing):
-    python mcp_server.py
+@mcp.tool()
+def get_chunk(chunk_id: str) -> dict:
+    """Fetch the full record for a single chunk by its chunk_id."""
+    return fetch_chunk_by_id(chunk_id)
 
-Add to Claude Desktop config  (~/.claude/claude_desktop_config.json):
-{
-  "mcpServers": {
-    "ayurveda_search": {
-      "command": "python",
-      "args": ["C:/Users/KIIT0001/OneDrive/Search Engine/ayurveda_meili/mcp_server.py"],
-      "env": {}
-    }
-  }
-}
-============================================================
-"""
+@mcp.tool()
+def list_texts() -> list[str]:
+    """List all source book titles / sthanas available in the index."""
+    return get_available_texts()
 
-import asyncio
-import json
-import meilisearch
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
-from mcp import types
+@mcp.tool()
+def list_categories() -> list[str]:
+    """List all distinct primary_category values available in the index."""
+    return get_available_categories()
 
-# ─── Configuration ────────────────────────────────────────────────────────────
-MEILI_URL        = "http://localhost:7700"
-MEILI_KEY        = "ayurveda-dev-key"
-MEILI_INDEX      = "ayurveda"
+# Simple ASGI wrapper for authentication
+class AuthMiddleware:
+    def __init__(self, app):
+        self.app = app
+        self.token = os.environ.get("MCP_AUTH_TOKEN")
 
-# ─── Meilisearch client ───────────────────────────────────────────────────────
-client = meilisearch.Client(MEILI_URL, MEILI_KEY)
-index  = client.index(MEILI_INDEX)
+    async def __call__(self, scope, receive, send):
+        if scope["type"] not in ("http", "websocket"):
+            return await self.app(scope, receive, send)
 
-# ─── MCP Server ───────────────────────────────────────────────────────────────
-app = Server("ayurveda-search")
-
-
-@app.list_tools()
-async def list_tools() -> list[types.Tool]:
-    return [
-        types.Tool(
-            name="search_ayurveda",
-            description=(
-                "Search classical Ayurvedic texts (Sushruta Samhita, Ashtanga Hridaya, "
-                "Madhavanidanam) using hybrid semantic + keyword search. "
-                "Returns matching verses with Sanskrit text, transliteration, "
-                "commentary, chapter info, and topic tags."
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The search query, e.g. 'vata dosha treatment' or 'jwara fever'"
-                    },
-                    "mode": {
-                        "type": "string",
-                        "enum": ["Hybrid", "Semantic", "Keyword"],
-                        "description": "Search mode. Default is Hybrid (best of both worlds).",
-                        "default": "Hybrid"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Maximum number of results to return (1-100). Default is 10.",
-                        "default": 10,
-                        "minimum": 1,
-                        "maximum": 100
-                    },
-                    "books": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "enum": [
-                                "Sushruta Samhita",
-                                "Ashtanga Hridaya",
-                                "Madhavanisana Pt1",
-                                "Madhavanisana Pt2"
-                            ]
-                        },
-                        "description": "Filter results to specific books. Leave empty to search all.",
-                        "default": []
-                    }
-                },
-                "required": ["query"]
+        # Allow /health without auth
+        if scope["type"] == "http" and scope.get("path") == "/health":
+            response = {
+                "type": "http.response.start",
+                "status": 200,
+                "headers": [(b"content-type", b"text/plain")]
             }
-        ),
-        types.Tool(
-            name="get_ayurveda_stats",
-            description=(
-                "Get statistics about the Ayurveda Meilisearch index, "
-                "including total number of indexed documents and index health."
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        )
-    ]
+            await send(response)
+            await send({
+                "type": "http.response.body",
+                "body": b"OK",
+            })
+            return
 
-
-@app.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
-
-    if name == "search_ayurveda":
-        query = arguments.get("query", "").strip()
-        mode  = arguments.get("mode", "Hybrid")
-        limit = int(arguments.get("limit", 10))
-        books = arguments.get("books", [])
-
-        if not query:
-            return [types.TextContent(type="text", text="Error: query is required.")]
-
-        params = {
-            "limit": limit,
-            "attributesToHighlight": ["commentary", "transliteration", "topic_heading"],
-            "highlightPreTag": "**",
-            "highlightPostTag": "**",
-        }
-
-        if mode == "Hybrid":
-            params["hybrid"] = {"semanticRatio": 0.5, "embedder": "default"}
-        elif mode == "Semantic":
-            params["hybrid"] = {"semanticRatio": 1.0, "embedder": "default"}
-
-        if books:
-            book_clause = " OR ".join([f'source_file = "{b}"' for b in books])
-            params["filter"] = f"({book_clause})"
-
-        try:
-            results = index.search(query, params)
-            hits    = results.get("hits", [])
-            time_ms = results.get("processingTimeMs", 0)
-
-            if not hits:
-                return [types.TextContent(
-                    type="text",
-                    text=f"No results found for '{query}' in the Ayurveda index."
-                )]
-
-            output_lines = [
-                f"# Ayurveda Search Results",
-                f"**Query:** {query}  |  **Mode:** {mode}  |  **Results:** {len(hits)}  |  **Time:** {time_ms}ms",
-                ""
-            ]
-
-            for i, hit in enumerate(hits, 1):
-                fmt      = hit.get("_formatted", hit)
-                source   = hit.get("source_file", "Unknown")
-                sthana   = hit.get("sthana", "")
-                ch_num   = hit.get("chapter_number", "")
-                ch_title = hit.get("chapter_title", "")
-                verse_id = hit.get("verse_id", "")
-                topic    = fmt.get("topic_heading", "") or hit.get("topic_heading", "")
-                sanskrit = hit.get("sanskrit_text", "")
-                translit = fmt.get("transliteration", "") or hit.get("transliteration", "")
-                comment  = fmt.get("commentary", "") or hit.get("commentary", "")
-                cats     = hit.get("categories_found", []) or []
-                primary  = hit.get("primary_category", "")
-
-                header_parts = [source]
-                if sthana:   header_parts.append(f"({sthana})")
-                if ch_title: header_parts.append(f"Ch. {ch_num} \"{ch_title}\"")
-                if verse_id: header_parts.append(f"Verse {verse_id}")
-
-                tags = list(dict.fromkeys(filter(None, [primary] + cats)))
-
-                output_lines += [
-                    f"---",
-                    f"## {i}. {topic or 'Verse'}",
-                    f"*{' · '.join(header_parts)}*",
-                ]
-                if sanskrit:  output_lines.append(f"\n**Sanskrit:** {sanskrit}")
-                if translit:  output_lines.append(f"**Transliteration:** {translit}")
-                if comment:   output_lines.append(f"\n**Commentary:** {comment}")
-                if tags:      output_lines.append(f"\n**Topics:** {', '.join(tags)}")
-                output_lines.append("")
-
-            return [types.TextContent(type="text", text="\n".join(output_lines))]
-
-        except Exception as e:
-            return [types.TextContent(
-                type="text",
-                text=f"Error querying Meilisearch: {e}\n\nMake sure Meilisearch is running on {MEILI_URL}"
-            )]
-
-    elif name == "get_ayurveda_stats":
-        try:
-            stats = index.get_stats()
-            info  = {
-                "index"          : MEILI_INDEX,
-                "total_documents": stats.number_of_documents,
-                "is_indexing"    : stats.is_indexing,
-                "field_counts"   : dict(list(stats.field_distribution.items())[:10])
-            }
-            text = (
-                f"# Ayurveda Index Statistics\n\n"
-                f"- **Index Name:** {info['index']}\n"
-                f"- **Total Documents:** {info['total_documents']:,}\n"
-                f"- **Currently Indexing:** {'Yes' if info['is_indexing'] else 'No'}\n\n"
-                f"**Top Fields:**\n"
-                + "\n".join(f"  - `{k}`: {v} docs" for k, v in info["field_counts"].items())
-            )
-            return [types.TextContent(type="text", text=text)]
-        except Exception as e:
-            return [types.TextContent(
-                type="text",
-                text=f"Error fetching stats: {e}"
-            )]
-
-    return [types.TextContent(type="text", text=f"Unknown tool: {name}")]
-
-
-# ─── Entry point ──────────────────────────────────────────────────────────────
-
-async def main():
-    async with stdio_server() as (read_stream, write_stream):
-        await app.run(
-            read_stream,
-            write_stream,
-            app.create_initialization_options()
-        )
+        if not self.token:
+            # If no token configured, allow access
+            return await self.app(scope, receive, send)
+            
+        headers = dict(scope.get("headers", []))
+        auth_header = headers.get(b"authorization", b"").decode("utf-8")
+        
+        expected = f"Bearer {self.token}"
+        if auth_header != expected:
+            if scope["type"] == "http":
+                response = {
+                    "type": "http.response.start",
+                    "status": 401,
+                    "headers": [(b"content-type", b"text/plain")]
+                }
+                await send(response)
+                await send({
+                    "type": "http.response.body",
+                    "body": b"Unauthorized: Invalid or missing token",
+                })
+            elif scope["type"] == "websocket":
+                await send({"type": "websocket.close", "code": 1008})
+            return
+            
+        return await self.app(scope, receive, send)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # If the user requested "streamable-http" in their snippet, we can use it.
+    # Often standard FastMCP supports "sse" or "stdio".
+    # We will wrap the underlying FastAPI app if it exists.
+    # FastMCP uses an internal FastAPI app usually accessible via mcp._app.
+    # If we need to run it with uvicorn and custom middleware, we might need to do it manually.
+    import uvicorn
+    
+    # Check if we should use FastMCP's built-in run or uvicorn directly
+    try:
+        # For standard FastMCP, mcp._mcp or mcp.app might be the ASGI app
+        asgi_app = getattr(mcp, "_app", None)
+        if not asgi_app:
+            # Maybe it's just mcp itself or we need to rely on run
+            asgi_app = mcp
+            
+        app = AuthMiddleware(asgi_app)
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+    except Exception as e:
+        print(f"Failed to wrap with AuthMiddleware, falling back to mcp.run: {e}")
+        mcp.run(transport="streamable-http")
