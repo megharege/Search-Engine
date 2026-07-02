@@ -6,7 +6,6 @@ ayurveda_meili/meili_logs/
 # Root-level Meilisearch artefacts (downloaded locally, NOT for GitHub)
 meilisearch.exe
 data.ms/
-enable_vector.py
 
 # Duplicate JSONL copies inside ayurveda_meili (originals are at root)
 ayurveda_meili/sushruta.jsonl
@@ -48,11 +47,10 @@ meili_data/
 qdrant_data/
 caddy_data/
 
-# Large generated data artifacts (re-generate with generate_embeddings.py)
-merged_books_with_embeddings.jsonl
-Final data/merged_books_with_embeddings.jsonl
-Final data/combined.jsonl
+# Large binary artifacts (re-generate with generate_embeddings.py if needed)
 Final data/embeddings.npz
 Final data/embeddings.npz.sha256
-Final data/generate_embeddings.py
+Final data/combined.jsonl
+
+# Meilisearch dumps (can be re-created via meilisearch dump command)
 dumps/

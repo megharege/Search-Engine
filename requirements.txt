@@ -1,7 +1,13 @@
 streamlit
 meilisearch
+sentence-transformers
+torch
+numpy
+requests
+pydantic
 google-generativeai
 anthropic
 uvicorn
 fastapi
 mcp
+python-dotenv

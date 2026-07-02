@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
+
 from mcp.server.fastmcp import FastMCP
 from search_core import hybrid_search, fetch_chunk_by_id, get_available_texts, get_available_categories
 
@@ -9,7 +12,7 @@ mcp = FastMCP("ayurveda-rag")
 def search_verses(query: str, sthana: str | None = None, primary_category: str | None = None, limit: int = 10) -> list[dict]:
     """Hybrid keyword + semantic search over classical Ayurvedic texts.
     Returns matching chunks with chunk_id, sthana, verse_id, sanskrit_text,
-    transliteration, topic_heading, and relevance score."""
+    transliteration, topic_heading, commentary, and relevance score."""
     return hybrid_search(query=query, sthana=sthana, primary_category=primary_category, limit=limit)
 
 @mcp.tool()
@@ -78,23 +81,22 @@ class AuthMiddleware:
         return await self.app(scope, receive, send)
 
 if __name__ == "__main__":
-    # If the user requested "streamable-http" in their snippet, we can use it.
-    # Often standard FastMCP supports "sse" or "stdio".
-    # We will wrap the underlying FastAPI app if it exists.
-    # FastMCP uses an internal FastAPI app usually accessible via mcp._app.
-    # If we need to run it with uvicorn and custom middleware, we might need to do it manually.
-    import uvicorn
+    import sys
     
-    # Check if we should use FastMCP's built-in run or uvicorn directly
-    try:
-        # For standard FastMCP, mcp._mcp or mcp.app might be the ASGI app
-        asgi_app = getattr(mcp, "_app", None)
-        if not asgi_app:
-            # Maybe it's just mcp itself or we need to rely on run
-            asgi_app = mcp
-            
-        app = AuthMiddleware(asgi_app)
-        uvicorn.run(app, host="0.0.0.0", port=8000)
-    except Exception as e:
-        print(f"Failed to wrap with AuthMiddleware, falling back to mcp.run: {e}")
-        mcp.run(transport="streamable-http")
+    # Default: run with SSE transport (standard MCP)
+    # Use --http flag to run with streamable-http transport via uvicorn + auth
+    if "--http" in sys.argv:
+        import uvicorn
+        try:
+            # FastMCP exposes an ASGI app for streamable-http
+            asgi_app = mcp.sse_app() if hasattr(mcp, "sse_app") else mcp.streamable_http_app()
+            app = AuthMiddleware(asgi_app)
+            print("Starting MCP server with HTTP transport + auth middleware on :8001")
+            uvicorn.run(app, host="0.0.0.0", port=8001)
+        except Exception as e:
+            print(f"HTTP transport failed ({e}), falling back to SSE transport...")
+            mcp.run(transport="sse")
+    else:
+        # Standard SSE transport — works with all MCP clients
+        print("Starting MCP server with SSE transport on default port...")
+        mcp.run(transport="sse")

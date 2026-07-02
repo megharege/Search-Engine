@@ -1,5 +1,8 @@
 import streamlit as st
 import meilisearch
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # Configure Page
 st.set_page_config(

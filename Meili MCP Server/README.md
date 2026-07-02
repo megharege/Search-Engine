@@ -1,47 +1,57 @@
-# Ayurveda MeiliSearch Setup
+# Ayurveda MCP Server & MeiliSearch Setup
 
-This folder contains the scripts and instructions to set up a MeiliSearch RAG index for Ayurveda texts.
+This folder contains the MCP (Model Context Protocol) server and MeiliSearch setup utilities.
 
 ## Prerequisites
 
-1. Python 3.8+
-2. The `meilisearch` Python package installed:
-   ```powershell
-   pip install meilisearch
-   ```
-3. MeiliSearch executable (downloaded in this folder as `meilisearch.exe`).
+1. Python 3.10+
+2. Dependencies installed: `pip install -r ../requirements.txt`
+3. MeiliSearch running (see below)
 
 ## Starting MeiliSearch
 
-Start the MeiliSearch server with the requested limits. For ~10k total documents, setting a max indexing memory of 200Mb and payload size of 100Mb is sufficient to prevent OOM errors.
+From the **project root**:
 
 ```powershell
-.\meilisearch.exe --master-key "ayurveda-dev-key" --no-analytics --max-indexing-memory 200Mb --http-payload-size-limit 100Mb
+.\meilisearch.exe --master-key "ayurveda-dev-key" --db-path "./data.ms" --no-analytics
 ```
-*(Keep this terminal running in the background).*
 
-## Setup the Index
+## Running the MCP Server
 
-Run the setup script to create the `ayurveda` index, configure searchable/filterable attributes, and set up the HuggingFace `intfloat/multilingual-e5-small` embedder.
+```powershell
+# Standard SSE transport (works with all MCP clients)
+python mcp_server.py
+
+# HTTP transport with auth middleware
+python mcp_server.py --http
+```
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `search_verses(query, sthana?, primary_category?, limit?)` | Hybrid search across all texts |
+| `get_chunk(chunk_id)` | Fetch a single verse by chunk_id |
+| `list_texts()` | List all available source books/sthanas |
+| `list_categories()` | List all primary categories |
+
+## Setup Utilities
+
+### Creating the Meilisearch Index
+
+If you need to set up the index from scratch (normally handled by `ingest.py` in the project root):
 
 ```powershell
 python meili_setup.py
 ```
 
-## Indexing the Documents
-
-Ensure your JSONL files (`sushruta.jsonl`, `bhavaprakasa.jsonl`, `madhavanidanam.jsonl`, `sharangadhara.jsonl`) are present in this directory (or update the paths below to point to them). Then run:
+### Indexing Individual JSONL Files
 
 ```powershell
-python meili_index.py sushruta.jsonl --source-file "Sushruta Samhita"
-python meili_index.py bhavaprakasa.jsonl --source-file "Bhavaprakasa Nighantu"
-python meili_index.py madhavanidanam.jsonl --source-file "Madhavanidanam"
-python meili_index.py sharangadhara.jsonl --source-file "Sharangadhara Samhita"
+python meili_index.py path/to/file.jsonl --source-file "Book Name"
 ```
 
-## Testing the Search
-
-To run a hybrid search query for "vata dosha jwara treatment" (with a `semanticRatio` of 0.5) and print index statistics:
+### Testing the Search
 
 ```powershell
 python test_search.py

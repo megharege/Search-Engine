@@ -3,6 +3,8 @@ import glob
 import json
 import time
 import logging
+from dotenv import load_dotenv
+load_dotenv()
 from meilisearch import Client as MeiliClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -84,19 +86,35 @@ def wait_for_meili(ms, task_uid):
         time.sleep(1)
 
 def main():
-    jsonl_files = ["merged_books_with_embeddings.jsonl"]
+    # Resolve paths relative to the script's own directory (not CWD)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     
-    if not os.path.exists(jsonl_files[0]):
-        logging.error(f"Merged file {jsonl_files[0]} not found. Run generate_embeddings.py first.")
+    # Look for the embeddings file in multiple locations
+    candidates = [
+        os.path.join(script_dir, "merged_books_with_embeddings.jsonl"),
+        os.path.join(script_dir, "Final data", "merged_books_with_embeddings.jsonl"),
+    ]
+    
+    jsonl_file = None
+    for path in candidates:
+        if os.path.exists(path):
+            jsonl_file = path
+            break
+    
+    if not jsonl_file:
+        logging.error(
+            "merged_books_with_embeddings.jsonl not found. "
+            "Checked:\n  " + "\n  ".join(candidates) + "\n"
+            "Run 'python Final data/generate_embeddings.py' first to generate it."
+        )
         return
         
     chunks = []
-    for fpath in jsonl_files:
-        logging.info(f"Loading data from {fpath}")
-        with open(fpath, encoding="utf-8") as f:
-            for l in f:
-                if l.strip():
-                    chunks.append(json.loads(l))
+    logging.info(f"Loading data from {jsonl_file}")
+    with open(jsonl_file, encoding="utf-8") as f:
+        for l in f:
+            if l.strip():
+                chunks.append(json.loads(l))
                     
     logging.info(f"Loaded total {len(chunks)} chunks.")
     

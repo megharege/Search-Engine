@@ -1,4 +1,7 @@
 import os
+from dotenv import load_dotenv
+load_dotenv()
+
 import json
 import logging
 import meilisearch
@@ -90,19 +93,18 @@ def hybrid_search(query: str, sthana: str | None = None, primary_category: str |
     if os.environ.get("GOOGLE_API_KEY") or os.environ.get("ANTHROPIC_API_KEY"):
         results = _llm_rerank(query, results)
         
-    # Format output to ensure required fields for MCP
+    # Pass through ALL fields from Meilisearch (needed by Streamlit UI & MCP)
+    # Only normalize the 'score' field for consistent downstream use
     formatted_results = []
     for r in results[:limit]:
-        formatted_results.append({
-            "chunk_id": r.get("chunk_id", ""),
-            "sthana": r.get("sthana", ""),
-            "verse_id": r.get("verse_id", ""),
-            "sanskrit_text": r.get("sanskrit_text", ""),
-            "transliteration": r.get("transliteration", ""),
-            "topic_heading": r.get("topic_heading", ""),
-            "score": r.get("score", r.get("_semanticScore", 0.0))
-        })
+        hit = dict(r)  # shallow copy to avoid mutating originals
+        # Normalize score: prefer LLM-assigned score, then _rankingScore, then _semanticScore
+        if "score" not in hit:
+            hit["score"] = hit.get("_rankingScore", hit.get("_semanticScore", 0.0))
+        formatted_results.append(hit)
         
+    # Ensure final output is strictly sorted by the normalized score descending
+    formatted_results.sort(key=lambda x: x["score"], reverse=True)
     return formatted_results
 
 def _meili_search(query: str, sthana: str | None, primary_category: str | None, limit: int, mode: str = "Hybrid", vector: list[float] | None = None) -> list[dict]:
@@ -115,7 +117,8 @@ def _meili_search(query: str, sthana: str | None, primary_category: str | None, 
             filters.append(f'primary_category = "{primary_category}"')
             
         params = {
-            "limit": limit
+            "limit": limit,
+            "showRankingScore": True
         }
         
         if mode in ["Hybrid", "Semantic"] and vector:
