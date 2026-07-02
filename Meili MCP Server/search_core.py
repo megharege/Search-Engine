@@ -183,6 +183,16 @@ Candidates:
         return hits
         
     for h in hits:
-        h["score"] = scores.get(h.get("chunk_id"), h.get("score", 0))
+        # Fall back to Meilisearch ranking score if LLM missed this chunk
+        original_score = h.get("_rankingScore", h.get("_semanticScore", 0.0))
+        # Optional: Normalize LLM 0-10 score to 0-1 scale if needed, or leave as is. 
+        # Meilisearch scores are 0-1.
+        llm_score = scores.get(h.get("chunk_id"))
         
+        if llm_score is not None:
+            # LLM gave a score (0-10), normalize it to 0-1 so it's comparable
+            h["score"] = llm_score / 10.0
+        else:
+            h["score"] = original_score
+            
     return sorted(hits, key=lambda x: x["score"], reverse=True)
