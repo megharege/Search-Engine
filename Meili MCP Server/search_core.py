@@ -22,6 +22,11 @@ except ImportError:
 # Configuration
 MEILI_URL = os.environ.get("MEILI_URL", "http://localhost:7700")
 MEILI_MASTER_KEY = os.environ.get("MEILI_MASTER_KEY", "ayurveda-dev-key")
+
+# Protect against users copying .env.example directly without changing placeholders
+if "your_secure" in MEILI_MASTER_KEY or not MEILI_MASTER_KEY.strip():
+    MEILI_MASTER_KEY = "ayurveda-dev-key"
+
 MEILI_INDEX = "ayurveda"
 
 # Clients
@@ -156,13 +161,20 @@ Candidates:
     
     scores = {}
     try:
-        if GEMINI_AVAILABLE and os.environ.get("GOOGLE_API_KEY"):
-            genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+        gemini_key = os.environ.get("GOOGLE_API_KEY", "")
+        anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        
+        # Ignore dummy placeholder keys from .env.example
+        if "your_" in gemini_key: gemini_key = ""
+        if "your_" in anthropic_key: anthropic_key = ""
+        
+        if GEMINI_AVAILABLE and gemini_key:
+            genai.configure(api_key=gemini_key)
             model = genai.GenerativeModel("gemini-2.0-flash")
             resp = model.generate_content(prompt)
             raw = resp.text.strip()
-        elif ANTHROPIC_AVAILABLE and os.environ.get("ANTHROPIC_API_KEY"):
-            client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        elif ANTHROPIC_AVAILABLE and anthropic_key:
+            client = Anthropic(api_key=anthropic_key)
             resp = client.messages.create(
                 model="claude-3-5-sonnet-20241022",
                 max_tokens=600,
