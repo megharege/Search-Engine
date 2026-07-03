@@ -1,0 +1,72 @@
+services:
+
+  # ── 1. Meilisearch ──────────────────────────────────────────────────────────
+  meilisearch:
+    image: getmeili/meilisearch:latest
+    container_name: ayur_meili
+    restart: unless-stopped
+    ports:
+      - "7700:7700"
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-localdevkey}
+      MEILI_ENV: development
+    volumes:
+      - meili_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── 2. Ingest — one-shot, idempotent, self-healing ────────────────────────────
+  ingest:
+    build: .
+    container_name: ayur_ingest
+    environment:
+      MEILI_URL:        http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-localdevkey}
+    depends_on:
+      meilisearch:
+        condition: service_healthy
+    command: python pipeline.py --steps 3
+
+  # ── 3. MCP / FastAPI server ────────────────────────────────────────────────────
+  mcp:
+    build: .
+    container_name: ayur_mcp
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      MEILI_URL:        http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-localdevkey}
+    depends_on:
+      ingest:
+        condition: service_completed_successfully
+    command: >
+      uvicorn mcp_server:app
+        --host 0.0.0.0
+        --port 8000
+        --workers 1
+
+  # ── 4. Streamlit UI ──────────────────────────────────────────────────────────
+  streamlit:
+    build: .
+    container_name: ayur_ui
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      MEILI_URL:        http://meilisearch:7700
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-localdevkey}
+    depends_on:
+      ingest:
+        condition: service_completed_successfully
+    command: >
+      streamlit run app.py
+        --server.port 8501
+        --server.address 0.0.0.0
+        --server.headless true
+
+volumes:
+  meili_data:

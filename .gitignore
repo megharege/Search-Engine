@@ -1,0 +1,52 @@
+data/combined.jsonl
+data/embeddings.npz
+data/embeddings.npz.sha256
+__pycache__/
+*.pyc
+.venv/
+venv/
+rag/
+.env
+# --- Python Virtual Environment ---
+# Based on the 'rag' folder shown in image_5eb387.png
+rag/
+venv/
+env/
+.venv/
+
+# --- Python Compiled Files ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- MeiliSearch Database & Data ---
+# Based on the 'data.ms' folder shown in image_5eb387.png
+data.ms/
+*.db
+*.sqlite3
+
+# --- Environment Variables ---
+# Based on the .env.example file shown in image_5eb387.png
+.env
+
+# --- IDE and OS Metadata ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Logs and Dumps ---
+# Based on the 'dumps' folder shown in image_5eb387.png
+dumps/
+*.log
+
+
+# Ignore executables and environment files
+*.exe
+.env
+.env.*
+# Ignore data and cache
+data/
+dumps/
+__pycache__/
+.streamlit/

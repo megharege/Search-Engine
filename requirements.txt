@@ -1,0 +1,15 @@
+# ── LOCAL DEV ────────────────────────────────────────────────────────────────
+# BEFORE pip install -r requirements.txt, install CUDA torch manually:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+# Do NOT add torch here — pip will overwrite your CUDA build with a CPU-only one.
+
+sentence-transformers>=3.0.0
+transformers>=4.51.0
+accelerate
+meilisearch>=0.31.0
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+streamlit
+pandas
+numpy
+tqdm
