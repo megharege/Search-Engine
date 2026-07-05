@@ -90,9 +90,10 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
     # Look for the embeddings file in multiple locations
+    parent_dir = os.path.dirname(script_dir)
     candidates = [
         os.path.join(script_dir, "merged_books_with_embeddings.jsonl"),
-        os.path.join(script_dir, "Final data", "merged_books_with_embeddings.jsonl"),
+        os.path.join(parent_dir, "Final data", "merged_books_with_embeddings.jsonl"),
     ]
     
     jsonl_file = None

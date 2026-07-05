@@ -1,6 +1,31 @@
 @echo off
+setlocal enabledelayedexpansion
 title Ayurveda Explorer – Starting...
 cd /d "%~dp0"
+
+:: ── 0. Download Data from Private Repo ──────────────────────────────────────
+if not exist "Final data\merged_books_with_embeddings.jsonl" (
+    echo [INFO] Dataset not found locally. Downloading from Hugging Face...
+    set /p HF_TOKEN="Enter your Hugging Face Token: "
+    set /p DATA_LINK="Enter the dataset link (e.g. https://huggingface.co/datasets/user/repo): "
+    
+    :: Inject the token into the URL for authentication
+    set "AUTH_LINK=!DATA_LINK:https://=https://oauth2:!HF_TOKEN!@!"
+    
+    echo Cloning repository...
+    git clone !AUTH_LINK! temp_dataset
+    
+    if !ERRORLEVEL! NEQ 0 (
+        echo [ERROR] Failed to clone the dataset. Please check your token and link.
+        pause
+        exit /b 1
+    )
+    
+    :: Move contents to Final data and cleanup
+    if not exist "Final data" mkdir "Final data"
+    xcopy /s /y "temp_dataset\*" "Final data\" >nul
+    rmdir /s /q "temp_dataset"
+)
 
 :: ── 1. Check for Meilisearch binary ─────────────────────────────────────────
 if not exist "ayurveda_meili\meilisearch.exe" (
