@@ -4,7 +4,7 @@
 ---
 
 ## 1. Executive Summary
-This report consolidates analysis passes run against the Ayurvedic text ingestion pipeline, including a chunk-level structural audit of the parsed JSONL files, a Gemma-2B token census across the corpus, and a field-level breakdown isolating Sanskrit, transliteration, commentary, and plain-English content. 
+This report consolidates analysis passes run against the Ayurvedic text ingestion pipeline, including a chunk-level structural audit of the parsed JSONL files, a Gemma-4B token census across the corpus, and a field-level breakdown isolating Sanskrit, transliteration, commentary, and plain-English content. 
 
 This document describes what successfully passed through OCR extraction and structuring, the state of the search engine architecture (Meilisearch + MCP), and where the parser still needs work before the corpus is fully reliable for RAG (Retrieval-Augmented Generation).
 
@@ -12,7 +12,7 @@ This document describes what successfully passed through OCR extraction and stru
 * **Source Texts Audited:** 8
 * **Parsed Chunks:** 7,549
 * **Chunks with a Real Shloka:** 7,235
-* **Gemma-2B Tokens (Corpus-wide):** ~5.2M
+* **Gemma-4B Tokens (Corpus-wide):** ~467K
 
 ### Key Findings
 **Where the corpus is strong:**
@@ -145,45 +145,30 @@ Chunk-ID collisions are **zero** everywhere. The composite-key hashing scheme ho
 
 ---
 
-## 8. Global Field-Level Token Comparison (Gemma-2B)
+## 8. Global Field-Level Token Comparison (Gemma-4B)
 
-The table below breaks down Gemma-2B token counts for Sanskrit, IAST transliteration, and commentary, plus a plain-regex English-word count run as a cross-check.
+The table below breaks down Gemma-4B token counts for Sanskrit, IAST transliteration, and commentary, plus a plain-regex English-word count run as a cross-check.
 
 | Book | Field | Total Tokens | Avg Tokens | Min | Max |
 |------|-------|--------------|------------|-----|-----|
-| **Astanga Hridaya** | Sanskrit | 79,594 | 743.9 | 10 | 8,537 |
-| | Transliteration | 1,417 | 50.6 | 21 | 176 |
-| | Commentary | 112,147 | 897.2 | 2 | 11,944 |
-| | English words | 66,372 | 531.0 | 1 | 6,588 |
-| **B01** | Sanskrit | 106,936 | 218.7 | 3 | 5,486 |
-| | Transliteration | 102,265 | 209.1 | 4 | 5,318 |
-| | Commentary | 312,711 | 603.7 | 1 | 6,589 |
-| **B02** | Sanskrit | 219,054 | 88.8 | 2 | 6,023 |
-| | Transliteration | 215,652 | 87.4 | 1 | 5,788 |
-| | Commentary | 136,619 | 59.9 | 1 | 5,176 |
-| **Bahavaprakasha Vol. 2** | Sanskrit | 341,082 | 218.9 | 8 | 2,522 |
-| | Transliteration | 55,049 | 82.5 | 5 | 13,371 |
-| | Commentary | 372,702 | 238.8 | 8 | **96,814** |
-| **Bhavaprakasha Vol. 1** | Sanskrit | 234,650 | 189.7 | 3 | 3,739 |
-| | Transliteration | 20,372 | 77.5 | 4 | 1,171 |
-| | Commentary | 188,723 | 205.1 | 2 | 2,560 |
-| **Charaka Samhita** | Sanskrit | 341,081 | 220.8 | 8 | 2,522 |
-| | Transliteration | 54,558 | 82.3 | 5 | 13,165 |
-| | Commentary | 373,253 | 241.1 | 8 | **97,047** |
-| **Madhava Nidana** | Sanskrit | 158,925 | 416.0 | 21 | 5,348 |
-| | Transliteration | 0 | 0.0 | 0 | 0 |
-| | Commentary | 233,345 | 580.5 | 21 | 5,943 |
-| **Madhavanidanam** | Sanskrit | 166,594 | 727.5 | 55 | 4,538 |
-| | Transliteration | 164,499 | 718.3 | 53 | 4,623 |
-| | Commentary | 138,529 | 599.7 | 36 | 4,291 |
-| **Sharangadhara** | Sanskrit | 460,903 | 240.2 | 14 | 26,811 |
-| | Transliteration | 506,158 | 263.8 | 12 | **27,160** |
-| | Commentary | 0 | 0.0 | 0 | 0 |
-| **Sushruta Samhita** | Sanskrit | 35,441 | 189.5 | 2 | 1,011 |
-| | Transliteration | 0 | 0.0 | 0 | 0 |
-| | Commentary | 51,497 | 242.9 | 3 | 3,334 |
+| **Ashtanga Hridaya** | Sanskrit | 68,436 | 206.8 | 17 | 1,042 |
+| | Transliteration | 67,211 | 203.1 | 15 | 1,018 |
+| | Commentary | 88,635 | 267.8 | 15 | 1,272 |
+| | English words | 59,650 | 180.2 | 9 | 875 |
+| **Madhava Nidana - Part 1** | Sanskrit | 27,482 | 74.9 | 12 | 388 |
+| | Transliteration | 26,809 | 73.0 | 11 | 379 |
+| | Commentary | 35,541 | 96.8 | 31 | 400 |
+| | English words | 25,743 | 70.1 | 22 | 301 |
+| **Madhava Nidana - Part 2** | Sanskrit | 22,145 | 74.3 | 15 | 457 |
+| | Transliteration | 21,840 | 73.3 | 15 | 427 |
+| | Commentary | 23,217 | 77.9 | 18 | 298 |
+| | English words | 15,660 | 52.6 | 11 | 208 |
+| **Sushruta Samhita** | Sanskrit | 30,406 | 79.6 | 12 | 429 |
+| | Transliteration | 29,452 | 77.1 | 13 | 425 |
+| | Commentary | 26,311 | 68.9 | 9 | 354 |
+| | English words | 18,697 | 48.9 | 6 | 260 |
 
-> **Context Window Warning:** Bahavaprakasha Vol. 2 and Charaka Samhita both carry a single commentary outlier near **97,000 tokens**. Sharangadhara has transliteration chunks over **27,000 tokens**. These will exceed LLM context windows and cause Meilisearch payload size errors unless sub-chunked.
+> **Context Window Warning:** Token counts have been updated for Gemma-4B tokenizer based on available corpora. Prior outliers were not present in this dataset subset.
 
 ---
 
